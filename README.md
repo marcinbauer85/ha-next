@@ -16,13 +16,31 @@ A touch-friendly Home Assistant dashboard built with Next.js, featuring real-tim
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+
+- A running Home Assistant instance
+- A Home Assistant Long-Lived Access Token
+
+### Setup
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Start the development server:
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+3. Open [http://localhost:3000](http://localhost:3000) in your browser. On first launch you'll see a setup screen asking for your **Home Assistant URL** and a **Long-Lived Access Token**. These are saved in your browser's localStorage — no server-side config needed.
+
+To generate a Long-Lived Access Token, open your Home Assistant instance and go to **Profile → Security → Long-Lived Access Tokens**.
+
+To reset stored credentials, scroll to the **Debug** section on the dashboard and tap **Clear credentials**.
 
 ## Deploy on Vercel
 

@@ -17,7 +17,7 @@ export function ConnectionToast({ status, errorMessage }: ConnectionToastProps) 
   const [haUrl, setHaUrl] = useState<string>('');
 
   useEffect(() => {
-    setHaUrl(process.env.NEXT_PUBLIC_HA_URL || 'http://localhost:8123');
+    setHaUrl(localStorage.getItem('ha_url') || '');
   }, []);
 
   useEffect(() => {

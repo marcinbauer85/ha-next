@@ -13,7 +13,7 @@ interface ScreensaverClockProps {
 }
 
 export function ScreensaverClock({ visible, onDismiss }: ScreensaverClockProps) {
-  const { entities } = useHomeAssistant();
+  const { entities, haUrl } = useHomeAssistant();
   const [time, setTime] = useState({ hours: '', minutes: '', seconds: '', period: '', isAM: true });
   const [date, setDate] = useState('');
   const [colonVisible, setColonVisible] = useState(true);
@@ -65,13 +65,13 @@ export function ScreensaverClock({ visible, onDismiss }: ScreensaverClockProps) 
       const picture = entity.attributes.entity_picture as string | undefined;
       const name = entity.attributes.friendly_name as string | undefined;
       return {
-        picture: picture ? `${process.env.NEXT_PUBLIC_HA_URL}${picture}` : undefined,
+        picture: picture ? `${haUrl}${picture}` : undefined,
         name: name || 'User',
         initials: name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'U',
       };
     }
     return { picture: undefined, name: 'User', initials: 'U' };
-  }, [entities]);
+  }, [entities, haUrl]);
 
   // Handle mount/unmount with animation
   useEffect(() => {

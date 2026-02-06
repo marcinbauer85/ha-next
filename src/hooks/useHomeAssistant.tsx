@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   useCallback,
   type ReactNode,
@@ -19,40 +20,49 @@ import {
 import type { CallServiceParams } from '@/lib/homeassistant';
 import type { HassEntities, HassEntity } from '@/types';
 
+const LS_URL_KEY = 'ha_url';
+const LS_TOKEN_KEY = 'ha_token';
+
 interface HomeAssistantContextValue {
   connected: boolean;
   connecting: boolean;
   error: string | null;
   entities: HassEntities;
+  haUrl: string;
+  configured: boolean;
   toggleEntity: (entityId: string) => Promise<void>;
   callService: (params: CallServiceParams) => Promise<void>;
   reconnect: () => Promise<void>;
+  saveCredentials: (url: string, token: string) => Promise<void>;
+  clearCredentials: () => void;
 }
 
 const HomeAssistantContext = createContext<HomeAssistantContextValue | null>(null);
 
 interface HomeAssistantProviderProps {
   children: ReactNode;
-  url?: string;
-  token?: string;
 }
 
-export function HomeAssistantProvider({
-  children,
-  url = process.env.NEXT_PUBLIC_HA_URL || '',
-  token = process.env.NEXT_PUBLIC_HA_TOKEN || '',
-}: HomeAssistantProviderProps) {
+export function HomeAssistantProvider({ children }: HomeAssistantProviderProps) {
+  const [haUrl, setHaUrl] = useState('');
+  const [haToken, setHaToken] = useState('');
+  const [configured, setConfigured] = useState(false);
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [entities, setEntities] = useState<HassEntities>({});
+  const hasAutoConnected = useRef(false);
 
-  const connectToHA = useCallback(async () => {
-    if (!url || !token) {
-      setError('Home Assistant URL or token not configured');
-      return;
-    }
+  // Load credentials from localStorage on mount
+  useEffect(() => {
+    const storedUrl = localStorage.getItem(LS_URL_KEY) || '';
+    const storedToken = localStorage.getItem(LS_TOKEN_KEY) || '';
+    setHaUrl(storedUrl);
+    setHaToken(storedToken);
+    setConfigured(!!storedUrl && !!storedToken);
+  }, []);
 
+  const doConnect = useCallback(async (url: string, token: string) => {
     setConnecting(true);
     setError(null);
 
@@ -66,16 +76,42 @@ export function HomeAssistantProvider({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Connection failed');
       setConnected(false);
+      throw err;
     } finally {
       setConnecting(false);
     }
-  }, [url, token]);
+  }, []);
+
+  // Save credentials: attempt connection first, only persist on success
+  const saveCredentials = useCallback(async (url: string, token: string) => {
+    const trimmedUrl = url.replace(/\/+$/, '');
+    await doConnect(trimmedUrl, token);
+    localStorage.setItem(LS_URL_KEY, trimmedUrl);
+    localStorage.setItem(LS_TOKEN_KEY, token);
+    setHaUrl(trimmedUrl);
+    setHaToken(token);
+    setConfigured(true);
+  }, [doConnect]);
+
+  const clearCredentials = useCallback(() => {
+    localStorage.removeItem(LS_URL_KEY);
+    localStorage.removeItem(LS_TOKEN_KEY);
+    disconnect();
+    setHaUrl('');
+    setHaToken('');
+    setConfigured(false);
+    setConnected(false);
+    setEntities({});
+    hasAutoConnected.current = false;
+  }, []);
 
   const reconnect = useCallback(async () => {
     disconnect();
     setConnected(false);
-    await connectToHA();
-  }, [connectToHA]);
+    if (haUrl && haToken) {
+      await doConnect(haUrl, haToken);
+    }
+  }, [haUrl, haToken, doConnect]);
 
   const toggleEntity = useCallback(async (entityId: string) => {
     try {
@@ -93,13 +129,14 @@ export function HomeAssistantProvider({
     }
   }, []);
 
+  // Auto-connect once on page load if credentials exist in localStorage
   useEffect(() => {
-    connectToHA();
-
-    return () => {
-      disconnect();
-    };
-  }, [connectToHA]);
+    if (configured && haUrl && haToken && !hasAutoConnected.current) {
+      hasAutoConnected.current = true;
+      doConnect(haUrl, haToken).catch(() => {});
+    }
+    return () => { disconnect(); };
+  }, [configured, haUrl, haToken, doConnect]);
 
   return (
     <HomeAssistantContext.Provider
@@ -108,9 +145,13 @@ export function HomeAssistantProvider({
         connecting,
         error,
         entities,
+        haUrl,
+        configured,
         toggleEntity,
         callService,
         reconnect,
+        saveCredentials,
+        clearCredentials,
       }}
     >
       {children}

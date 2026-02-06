@@ -134,7 +134,7 @@ function TipsCard({ onToggleImmersive, onToggleDarkMode, onToggleScreensaver }: 
 }
 
 function PeopleBadge({ compact = false }: { compact?: boolean }) {
-  const { entities } = useHomeAssistant();
+  const { entities, haUrl } = useHomeAssistant();
 
   const peopleHome = useMemo(() => {
     return Object.entries(entities)
@@ -142,7 +142,7 @@ function PeopleBadge({ compact = false }: { compact?: boolean }) {
       .map(([, entity]) => ({
         name: entity.attributes.friendly_name as string || 'User',
         picture: entity.attributes.entity_picture
-          ? `${process.env.NEXT_PUBLIC_HA_URL}${entity.attributes.entity_picture}`
+          ? `${haUrl}${entity.attributes.entity_picture}`
           : undefined,
         initials: ((entity.attributes.friendly_name as string) || 'U')
           .split(' ')
@@ -151,7 +151,7 @@ function PeopleBadge({ compact = false }: { compact?: boolean }) {
           .toUpperCase()
           .slice(0, 2),
       }));
-  }, [entities]);
+  }, [entities, haUrl]);
 
   if (compact) {
     // Mobile: stacked avatars + count

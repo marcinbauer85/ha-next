@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { TopBar } from '@/components/layout';
 import { EntityCard, RoomCard } from '@/components/cards';
 import { DashboardSection, MobileSummaryRow, SummariesPanel, PullToRevealPanel } from '@/components/sections';
-import { useTheme, useIdleTimer, useImmersiveMode } from '@/hooks';
+import { useTheme, useIdleTimer, useImmersiveMode, useHomeAssistant } from '@/hooks';
 import { usePullToRevealContext } from '@/contexts';
 import { ScreensaverClock } from '@/components/ui/ScreensaverClock';
 import {
@@ -20,6 +20,7 @@ import {
   mdiDoorOpen,
   mdiToyBrickOutline,
   mdiBalcony,
+  mdiDeleteOutline,
 } from '@mdi/js';
 
 // Mock data for static rendering - will be replaced with real HA data
@@ -45,6 +46,7 @@ const SCREENSAVER_TIMEOUT = 60000; // 1 minute of inactivity
 
 export default function DashboardPage() {
   const { toggleTheme } = useTheme();
+  const { clearCredentials } = useHomeAssistant();
   const { immersiveMode, setImmersiveMode, toggleImmersiveMode } = useImmersiveMode();
   const [screensaverActive, setScreensaverActive] = useState(false);
   const scrollableRef = useRef<HTMLElement | null>(null);
@@ -148,6 +150,17 @@ export default function DashboardPage() {
                       activeEntities={room.activeEntities}
                     />
                   ))}
+                </DashboardSection>
+
+                {/* Debug */}
+                <DashboardSection title="Debug" columns={3}>
+                  <EntityCard
+                    icon={mdiDeleteOutline}
+                    title="Clear credentials"
+                    state="Reset connection"
+                    color="danger"
+                    onClick={clearCredentials}
+                  />
                 </DashboardSection>
               </main>
 

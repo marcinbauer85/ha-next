@@ -69,7 +69,7 @@ interface StatusBarProps {
 
 export function StatusBar({ immersiveMode = false, connectionStatus }: StatusBarProps) {
   const pathname = usePathname();
-  const { entities, callService } = useHomeAssistant();
+  const { entities, callService, haUrl } = useHomeAssistant();
   const [currentTime, setCurrentTime] = useState<string>('');
   const [timerDisplays, setTimerDisplays] = useState<Record<string, string>>({});
   const [timerProgress, setTimerProgress] = useState<Record<string, number>>({});
@@ -273,12 +273,12 @@ export function StatusBar({ immersiveMode = false, connectionStatus }: StatusBar
       const picture = entity.attributes.entity_picture as string | undefined;
       const name = entity.attributes.friendly_name as string | undefined;
       return {
-        picture: picture ? `${process.env.NEXT_PUBLIC_HA_URL}${picture}` : undefined,
+        picture: picture ? `${haUrl}${picture}` : undefined,
         initials: name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'U',
       };
     }
     return { picture: undefined, initials: 'U' };
-  }, [entities]);
+  }, [entities, haUrl]);
 
   return (
     <footer className="hidden lg:flex items-center justify-between bg-surface-default pr-edge pt-ha-2 pb-edge col-span-full" data-component="StatusBar">
@@ -363,7 +363,7 @@ export function StatusBar({ immersiveMode = false, connectionStatus }: StatusBar
           >
             {player.entityPicture ? (
               <img
-                src={`${process.env.NEXT_PUBLIC_HA_URL}${player.entityPicture}`}
+                src={`${haUrl}${player.entityPicture}`}
                 alt=""
                 className="w-8 h-8 rounded-full object-cover"
               />

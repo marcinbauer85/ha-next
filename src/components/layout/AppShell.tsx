@@ -4,6 +4,7 @@ import { useState, useEffect, ReactNode } from 'react';
 import { Sidebar, StatusBar, MobileNav } from '@/components/layout';
 import { useHomeAssistant, useImmersiveMode } from '@/hooks';
 import { ConnectionToast } from '@/components/ui/ConnectionToast';
+import { SetupScreen } from '@/components/ui/SetupScreen';
 import type { ConnectionStatus } from '@/components/ui/ConnectionToast';
 
 interface AppShellProps {
@@ -11,7 +12,7 @@ interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
-  const { connecting, connected, error } = useHomeAssistant();
+  const { connecting, connected, error, configured, saveCredentials } = useHomeAssistant();
   const { immersiveMode } = useImmersiveMode();
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(null);
   const [wasConnecting, setWasConnecting] = useState(false);
@@ -40,6 +41,10 @@ export function AppShell({ children }: AppShellProps) {
       return () => clearTimeout(timer);
     }
   }, [connectionStatus]);
+
+  if (!configured) {
+    return <SetupScreen onSave={saveCredentials} error={error} connecting={connecting} />;
+  }
 
   return (
     <div className="min-h-screen bg-surface-default">

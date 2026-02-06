@@ -37,7 +37,7 @@ interface MobileNavProps {
 
 export function MobileNav({ disableAutoHide = false, connectionStatus }: MobileNavProps) {
   const pathname = usePathname();
-  const { entities } = useHomeAssistant();
+  const { entities, haUrl } = useHomeAssistant();
   const { isRevealed, close } = usePullToRevealContext();
   const [currentTime, setCurrentTime] = useState<string>('');
   const [isAM, setIsAM] = useState(true);
@@ -192,12 +192,12 @@ export function MobileNav({ disableAutoHide = false, connectionStatus }: MobileN
       const picture = entity.attributes.entity_picture as string | undefined;
       const name = entity.attributes.friendly_name as string | undefined;
       return {
-        picture: picture ? `${process.env.NEXT_PUBLIC_HA_URL}${picture}` : undefined,
+        picture: picture ? `${haUrl}${picture}` : undefined,
         initials: name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'U',
       };
     }
     return { picture: undefined, initials: 'U' };
-  }, [entities]);
+  }, [entities, haUrl]);
 
   // Check cloud/remote connection status
   const isRemoteConnected = useMemo(() => {
@@ -357,7 +357,7 @@ export function MobileNav({ disableAutoHide = false, connectionStatus }: MobileN
                   <div className="absolute inset-0 rounded-full overflow-hidden bg-fill-primary-normal">
                     {activeMedia?.entityPicture ? (
                       <img
-                        src={`${process.env.NEXT_PUBLIC_HA_URL}${activeMedia.entityPicture}`}
+                        src={`${haUrl}${activeMedia.entityPicture}`}
                         alt=""
                         className="w-full h-full object-cover"
                       />
