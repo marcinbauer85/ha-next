@@ -26,7 +26,7 @@ export default function DashboardPage({ params }: DashboardPageProps) {
     <>
       {/* TopBar row */}
       <div className="px-edge lg:pr-edge overflow-hidden flex-shrink-0 h-16">
-        <TopBar title={title} icon={dashboard?.icon} />
+        <TopBar title={title} icon={dashboard?.icon ?? undefined} />
       </div>
 
       {/* Pull to reveal - drag handle between TopBar and dashboard (Mobile only) */}

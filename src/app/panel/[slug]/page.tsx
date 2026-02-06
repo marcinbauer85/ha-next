@@ -26,7 +26,7 @@ export default function PanelPage({ params }: PanelPageProps) {
     <>
       {/* TopBar row */}
       <div className="px-edge lg:pr-edge overflow-hidden flex-shrink-0 h-16">
-        <TopBar title={title} icon={panel?.icon} />
+        <TopBar title={title} icon={panel?.icon ?? undefined} />
       </div>
 
       {/* Pull to reveal - drag handle between TopBar and dashboard (Mobile only) */}
