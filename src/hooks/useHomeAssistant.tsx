@@ -30,6 +30,7 @@ interface HomeAssistantContextValue {
   entities: HassEntities;
   haUrl: string;
   configured: boolean;
+  hydrated: boolean;
   toggleEntity: (entityId: string) => Promise<void>;
   callService: (params: CallServiceParams) => Promise<void>;
   reconnect: () => Promise<void>;
@@ -47,6 +48,7 @@ export function HomeAssistantProvider({ children }: HomeAssistantProviderProps) 
   const [haUrl, setHaUrl] = useState('');
   const [haToken, setHaToken] = useState('');
   const [configured, setConfigured] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +62,7 @@ export function HomeAssistantProvider({ children }: HomeAssistantProviderProps) 
     setHaUrl(storedUrl);
     setHaToken(storedToken);
     setConfigured(!!storedUrl && !!storedToken);
+    setHydrated(true);
   }, []);
 
   const doConnect = useCallback(async (url: string, token: string) => {
@@ -147,6 +150,7 @@ export function HomeAssistantProvider({ children }: HomeAssistantProviderProps) 
         entities,
         haUrl,
         configured,
+        hydrated,
         toggleEntity,
         callService,
         reconnect,

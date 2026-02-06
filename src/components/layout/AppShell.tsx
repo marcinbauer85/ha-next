@@ -12,7 +12,7 @@ interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
-  const { connecting, connected, error, configured, saveCredentials } = useHomeAssistant();
+  const { connecting, connected, error, configured, hydrated, saveCredentials } = useHomeAssistant();
   const { immersiveMode } = useImmersiveMode();
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(null);
   const [wasConnecting, setWasConnecting] = useState(false);
@@ -41,6 +41,10 @@ export function AppShell({ children }: AppShellProps) {
       return () => clearTimeout(timer);
     }
   }, [connectionStatus]);
+
+  if (!hydrated) {
+    return null;
+  }
 
   if (!configured) {
     return <SetupScreen onSave={saveCredentials} error={error} connecting={connecting} />;
