@@ -1,0 +1,72 @@
+'use client';
+
+import { useState, useEffect, ReactNode } from 'react';
+import { Sidebar, StatusBar, MobileNav } from '@/components/layout';
+import { useHomeAssistant, useImmersiveMode } from '@/hooks';
+import { ConnectionToast } from '@/components/ui/ConnectionToast';
+import type { ConnectionStatus } from '@/components/ui/ConnectionToast';
+
+interface AppShellProps {
+  children: ReactNode;
+}
+
+export function AppShell({ children }: AppShellProps) {
+  const { connecting, connected, error } = useHomeAssistant();
+  const { immersiveMode } = useImmersiveMode();
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(null);
+  const [wasConnecting, setWasConnecting] = useState(false);
+
+  // Track connection state changes
+  useEffect(() => {
+    if (connecting) {
+      setConnectionStatus('connecting');
+      setWasConnecting(true);
+    } else if (error) {
+      setConnectionStatus('error');
+    } else if (connected && wasConnecting) {
+      setConnectionStatus('connected');
+      setWasConnecting(false);
+    } else if (!connecting && !error && !connected) {
+      setConnectionStatus(null);
+    }
+  }, [connecting, connected, error, wasConnecting]);
+
+  // Auto-hide "connected" status after 3 seconds
+  useEffect(() => {
+    if (connectionStatus === 'connected') {
+      const timer = setTimeout(() => {
+        setConnectionStatus(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [connectionStatus]);
+
+  return (
+    <div className="min-h-screen bg-surface-default">
+      <div className={`h-screen flex flex-col lg:grid lg:grid-rows-[auto_1fr_auto] lg:grid-cols-[auto_1fr] lg:pt-edge transition-[padding] duration-300 ease-out ${
+        immersiveMode ? 'lg:pl-0' : 'lg:pl-edge'
+      }`}>
+        {/* Sidebar - Desktop only, spans top bar and content rows */}
+        <div className={`hidden lg:block lg:row-span-2 overflow-hidden transition-[width,opacity] duration-300 ease-out ${
+          immersiveMode ? 'w-0 opacity-0' : 'w-16 opacity-100'
+        }`}>
+          <div className="w-16 h-full">
+            <Sidebar />
+          </div>
+        </div>
+
+        {/* Children includes TopBar and content from page */}
+        {children}
+
+        {/* Status bar row - Desktop only */}
+        <StatusBar immersiveMode={immersiveMode} connectionStatus={connectionStatus} />
+      </div>
+
+      {/* Mobile navigation - Outside grid for proper fixed positioning */}
+      <MobileNav connectionStatus={connectionStatus} />
+
+      {/* Connection status toast */}
+      <ConnectionToast status={connectionStatus} />
+    </div>
+  );
+}

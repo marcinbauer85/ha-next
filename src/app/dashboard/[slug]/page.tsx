@@ -1,0 +1,93 @@
+'use client';
+
+import { use } from 'react';
+import { TopBar } from '@/components/layout';
+import { PullToRevealPanel } from '@/components/sections';
+import { useSidebarItems } from '@/hooks';
+import { usePullToRevealContext } from '@/contexts';
+
+interface DashboardPageProps {
+  params: Promise<{ slug: string }>;
+}
+
+export default function DashboardPage({ params }: DashboardPageProps) {
+  const { slug } = use(params);
+  const { items } = useSidebarItems();
+  const { isRevealed } = usePullToRevealContext();
+
+  // Find the dashboard info
+  const dashboard = items.find(
+    item => item.type === 'dashboard' && item.urlPath === `/dashboard/${slug}`
+  );
+
+  const title = dashboard?.title || slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+  return (
+    <>
+      {/* TopBar row */}
+      <div className="px-edge lg:pr-edge overflow-hidden flex-shrink-0 h-16">
+        <TopBar title={title} icon={dashboard?.icon} />
+      </div>
+
+      {/* Pull to reveal - drag handle between TopBar and dashboard (Mobile only) */}
+      <PullToRevealPanel />
+
+      {/* Main content row - shrinks as panel expands */}
+      <div className={`min-h-0 overflow-hidden px-edge pb-20 mt-1 lg:mt-0 lg:pb-ha-0 lg:pr-edge transition-all duration-300 ease-out ${
+        isRevealed ? 'flex-none h-0 opacity-0' : 'flex-1'
+      }`}>
+        <div className="h-full bg-surface-lower overflow-hidden rounded-ha-3xl">
+          <div className="h-full overflow-y-auto px-ha-3 py-ha-4 lg:px-ha-5 lg:py-ha-5" data-scrollable="dashboard">
+            {/* Skeleton cards grid */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-ha-3">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div key={i} className="bg-surface-low rounded-ha-xl p-ha-3 space-y-ha-2">
+                  <div className="flex items-center gap-ha-2">
+                    <div className="w-10 h-10 rounded-full bg-surface-lower" />
+                    <div className="flex-1 space-y-ha-1">
+                      <div className="h-3 bg-surface-lower rounded-full w-3/4" />
+                      <div className="h-2 bg-surface-lower rounded-full w-1/2" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Skeleton section */}
+            <div className="mt-ha-6">
+              <div className="h-4 bg-surface-low rounded-full w-32 mb-ha-3" />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-ha-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="bg-surface-low rounded-ha-xl p-ha-4 space-y-ha-3">
+                    <div className="flex justify-between items-center">
+                      <div className="h-3 bg-surface-lower rounded-full w-24" />
+                      <div className="w-8 h-8 rounded-ha-lg bg-surface-lower" />
+                    </div>
+                    <div className="h-16 bg-surface-lower rounded-ha-lg" />
+                    <div className="flex gap-ha-2">
+                      <div className="h-2 bg-surface-lower rounded-full flex-1" />
+                      <div className="h-2 bg-surface-lower rounded-full w-16" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* More skeleton cards */}
+            <div className="mt-ha-6">
+              <div className="h-4 bg-surface-low rounded-full w-24 mb-ha-3" />
+              <div className="grid grid-cols-3 lg:grid-cols-6 gap-ha-2">
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <div key={i} className="bg-surface-low rounded-ha-xl p-ha-2 aspect-square flex flex-col items-center justify-center gap-ha-2">
+                    <div className="w-8 h-8 rounded-full bg-surface-lower" />
+                    <div className="h-2 bg-surface-lower rounded-full w-3/4" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}

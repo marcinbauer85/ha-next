@@ -1,0 +1,159 @@
+import {
+  createConnection,
+  subscribeEntities,
+  createLongLivedTokenAuth,
+  Connection,
+  HassEntities as HAEntities,
+  ERR_CANNOT_CONNECT,
+  ERR_INVALID_AUTH,
+} from 'home-assistant-js-websocket';
+import type { HassConfig, CallServiceParams } from './types';
+
+let connection: Connection | null = null;
+let entitySubscription: (() => void) | null = null;
+
+export async function connect(config: HassConfig): Promise<Connection> {
+  if (connection) {
+    return connection;
+  }
+
+  const auth = createLongLivedTokenAuth(config.url, config.token);
+
+  try {
+    connection = await createConnection({ auth });
+    return connection;
+  } catch (error) {
+    if (error === ERR_CANNOT_CONNECT) {
+      throw new Error('Unable to connect to Home Assistant. Check your URL.');
+    }
+    if (error === ERR_INVALID_AUTH) {
+      throw new Error('Invalid authentication. Check your access token.');
+    }
+    throw error;
+  }
+}
+
+export function disconnect(): void {
+  if (entitySubscription) {
+    entitySubscription();
+    entitySubscription = null;
+  }
+  if (connection) {
+    connection.close();
+    connection = null;
+  }
+}
+
+export function getConnection(): Connection | null {
+  return connection;
+}
+
+export function subscribeToEntities(
+  callback: (entities: HAEntities) => void
+): () => void {
+  if (!connection) {
+    throw new Error('Not connected to Home Assistant');
+  }
+
+  if (entitySubscription) {
+    entitySubscription();
+  }
+
+  entitySubscription = subscribeEntities(connection, callback);
+  return entitySubscription;
+}
+
+export async function callService(params: CallServiceParams): Promise<void> {
+  if (!connection) {
+    throw new Error('Not connected to Home Assistant');
+  }
+
+  const { domain, service, serviceData, target } = params;
+
+  await connection.sendMessagePromise({
+    type: 'call_service',
+    domain,
+    service,
+    service_data: serviceData,
+    target,
+  });
+}
+
+export async function toggleEntity(entityId: string): Promise<void> {
+  const [domain] = entityId.split('.');
+
+  const toggleDomains = ['light', 'switch', 'fan', 'input_boolean', 'automation', 'script'];
+
+  if (toggleDomains.includes(domain)) {
+    await callService({
+      domain,
+      service: 'toggle',
+      target: { entity_id: entityId },
+    });
+  } else if (domain === 'cover') {
+    await callService({
+      domain: 'cover',
+      service: 'toggle',
+      target: { entity_id: entityId },
+    });
+  } else if (domain === 'lock') {
+    await callService({
+      domain: 'lock',
+      service: 'lock', // Would need to check state for unlock
+      target: { entity_id: entityId },
+    });
+  }
+}
+
+export interface HaPanel {
+  component_name: string;
+  config: Record<string, unknown> | null;
+  config_panel_domain?: string;
+  icon: string | null;
+  title: string | null;
+  url_path: string;
+}
+
+export interface HaDashboard {
+  id: string;
+  title: string;
+  show_in_sidebar: boolean;
+  require_admin: boolean;
+  icon?: string;
+  url_path: string;
+  mode: string;
+}
+
+export async function getPanels(): Promise<Record<string, HaPanel>> {
+  if (!connection) {
+    throw new Error('Not connected to Home Assistant');
+  }
+
+  try {
+    const result = await connection.sendMessagePromise<Record<string, HaPanel>>({
+      type: 'get_panels',
+    });
+    return result;
+  } catch (err) {
+    console.error('getPanels error:', err);
+    throw err;
+  }
+}
+
+export async function getDashboards(): Promise<HaDashboard[]> {
+  if (!connection) {
+    throw new Error('Not connected to Home Assistant');
+  }
+
+  try {
+    // Try the standard lovelace/dashboards endpoint
+    const result = await connection.sendMessagePromise<HaDashboard[]>({
+      type: 'lovelace/dashboards',
+    });
+    return result;
+  } catch (err) {
+    console.error('getDashboards error details:', JSON.stringify(err));
+    // Return empty array if dashboards API fails (might not be available)
+    return [];
+  }
+}
