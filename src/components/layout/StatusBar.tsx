@@ -19,6 +19,7 @@ import {
   mdiBell,
   mdiWeb,
   mdiSend,
+  mdiDevices,
 } from '@mdi/js';
 
 interface Timer {
@@ -63,11 +64,10 @@ function parseTimeToSeconds(time: string): number {
 export type ConnectionStatusType = 'connecting' | 'connected' | 'error' | null;
 
 interface StatusBarProps {
-  immersiveMode?: boolean;
   connectionStatus?: ConnectionStatusType;
 }
 
-export function StatusBar({ immersiveMode = false, connectionStatus }: StatusBarProps) {
+export function StatusBar({ connectionStatus }: StatusBarProps) {
   const pathname = usePathname();
   const { entities, callService, haUrl } = useHomeAssistant();
   const [currentTime, setCurrentTime] = useState<string>('');
@@ -263,6 +263,18 @@ export function StatusBar({ immersiveMode = false, connectionStatus }: StatusBar
     return false;
   }, [entities]);
 
+  // Count offline devices (only entities that belong to physical devices)
+  const offlineCount = useMemo(() => {
+    return Object.values(entities).filter((entity) => {
+      // Only count entities that belong to a physical device
+      const hasDeviceId = entity.attributes.device_id !== undefined && entity.attributes.device_id !== null;
+      if (!hasDeviceId) return false;
+      
+      // Check if the device is offline
+      return entity.state === 'unavailable' || entity.state === 'unknown';
+    }).length;
+  }, [entities]);
+
   // Get current user's avatar (for immersive mode)
   const userAvatar = useMemo(() => {
     const personEntry = Object.entries(entities).find(
@@ -290,7 +302,7 @@ export function StatusBar({ immersiveMode = false, connectionStatus }: StatusBar
           className={`p-ha-1 rounded-full transition-all ${
             pathname === '/panel/profile' ? 'ring-2 ring-ha-blue' : 'hover:ring-2 hover:ring-surface-lower'
           }`}
-          style={{ marginLeft: immersiveMode ? 'calc(var(--ha-edge-padding) + 8px)' : '8px' }}
+          style={{ marginLeft: '8px' }}
         >
           <Avatar src={userAvatar.picture} initials={userAvatar.initials} size="md" />
         </Link>
@@ -372,11 +384,11 @@ export function StatusBar({ immersiveMode = false, connectionStatus }: StatusBar
                 <Icon path={mdiPlay} size={16} className="text-ha-blue" />
               </div>
             )}
-            <div className="flex flex-col">
-              <span className="text-sm font-medium text-text-primary">
+            <div className="flex flex-col min-w-0 max-w-[140px]">
+              <span className="text-sm font-medium text-text-primary truncate">
                 {player.mediaTitle || player.name}
               </span>
-              <span className={`text-xs ${player.state === 'paused' ? 'text-yellow-600' : 'text-text-secondary'}`}>
+              <span className={`text-xs truncate ${player.state === 'paused' ? 'text-yellow-600' : 'text-text-secondary'}`}>
                 {player.mediaArtist || (player.state === 'playing' ? 'Playing' : 'Paused')}
               </span>
             </div>
@@ -438,11 +450,11 @@ export function StatusBar({ immersiveMode = false, connectionStatus }: StatusBar
                 className={timer.state === 'active' ? 'text-ha-blue' : 'text-yellow-600'}
               />
             </CircularProgress>
-            <div className="flex flex-col">
-              <span className="text-sm font-medium text-text-primary">
+            <div className="flex flex-col min-w-0 max-w-[140px]">
+              <span className="text-sm font-medium text-text-primary truncate">
                 {timerDisplays[timer.entity_id] || timer.remaining}
               </span>
-              <span className="text-xs text-text-secondary">{timer.name}</span>
+              <span className="text-xs text-text-secondary truncate">{timer.name}</span>
             </div>
           </div>
         ))}
@@ -456,7 +468,7 @@ export function StatusBar({ immersiveMode = false, connectionStatus }: StatusBar
             <Icon
               path={mdiUpdate}
               size={20}
-              className={pendingUpdates > 0 ? 'text-ha-blue' : 'text-text-secondary'}
+              className="text-text-secondary"
             />
             {pendingUpdates > 0 && (
               <span className="absolute -top-0.5 -right-0.5 bg-ha-blue rounded-full w-2 h-2" />
@@ -466,13 +478,19 @@ export function StatusBar({ immersiveMode = false, connectionStatus }: StatusBar
 
         {/* Remote access indicator */}
         <Tooltip content={isRemoteConnected ? 'Remote Access: Available via internet' : 'Remote Access: Not exposed to internet'}>
-          <span className="cursor-help">
+          <div className="relative cursor-help">
             <Icon
               path={mdiWeb}
               size={20}
-              className={isRemoteConnected ? 'text-text-secondary' : 'text-red-500'}
+              className="text-text-secondary"
             />
-          </span>
+            {isRemoteConnected && (
+              <span className="absolute -top-0.5 -right-0.5 bg-green-500 rounded-full w-2 h-2" />
+            )}
+            {!isRemoteConnected && (
+              <span className="absolute -top-0.5 -right-0.5 bg-red-500 rounded-full w-2 h-2" />
+            )}
+          </div>
         </Tooltip>
 
         {/* Notifications indicator */}
@@ -481,10 +499,24 @@ export function StatusBar({ immersiveMode = false, connectionStatus }: StatusBar
             <Icon
               path={mdiBell}
               size={20}
-              className={notificationCount > 0 ? 'text-yellow-600' : 'text-text-secondary'}
+              className="text-text-secondary"
             />
             {notificationCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 bg-yellow-500 rounded-full w-2 h-2" />
+            )}
+          </div>
+        </Tooltip>
+
+        {/* Offline devices indicator */}
+        <Tooltip content={offlineCount > 0 ? `Offline: ${offlineCount} device${offlineCount > 1 ? 's' : ''} unavailable` : 'Devices: All online'}>
+          <div className="relative cursor-help">
+            <Icon
+              path={mdiDevices}
+              size={20}
+              className="text-text-secondary"
+            />
+            {offlineCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 bg-red-500 rounded-full w-2 h-2" />
             )}
           </div>
         </Tooltip>

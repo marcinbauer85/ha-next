@@ -5,6 +5,7 @@ import { Sidebar, StatusBar, MobileNav } from '@/components/layout';
 import { useHomeAssistant, useImmersiveMode } from '@/hooks';
 import { ConnectionToast } from '@/components/ui/ConnectionToast';
 import { SetupScreen } from '@/components/ui/SetupScreen';
+import { InstallBanner } from '@/components/ui/InstallBanner';
 import type { ConnectionStatus } from '@/components/ui/ConnectionToast';
 
 interface AppShellProps {
@@ -13,7 +14,7 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const { connecting, connected, error, configured, hydrated, saveCredentials } = useHomeAssistant();
-  const { immersiveMode } = useImmersiveMode();
+  const { immersivePhase } = useImmersiveMode();
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(null);
   const [wasConnecting, setWasConnecting] = useState(false);
 
@@ -52,27 +53,26 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="min-h-screen bg-surface-default">
-      <div className={`h-screen flex flex-col lg:grid lg:grid-rows-[auto_1fr_auto] lg:grid-cols-[auto_1fr] lg:pt-edge transition-[padding] duration-300 ease-out ${
-        immersiveMode ? 'lg:pl-0' : 'lg:pl-edge'
-      }`}>
+      <div className="h-screen flex flex-col lg:grid lg:grid-rows-[auto_1fr_auto] lg:grid-cols-[auto_1fr] lg:pt-edge lg:pl-edge">
         {/* Sidebar - Desktop only, spans top bar and content rows */}
-        <div className={`hidden lg:block lg:row-span-2 overflow-hidden transition-[width,opacity] duration-300 ease-out ${
-          immersiveMode ? 'w-0 opacity-0' : 'w-16 opacity-100'
+        <div className={`hidden lg:block lg:row-span-2 transition-opacity duration-300 ease-out ${
+          immersivePhase !== 'normal' ? 'opacity-0 pointer-events-none' : 'opacity-100'
         }`}>
-          <div className="w-16 h-full">
-            <Sidebar />
-          </div>
+          <Sidebar />
         </div>
 
         {/* Children includes TopBar and content from page */}
         {children}
 
         {/* Status bar row - Desktop only */}
-        <StatusBar immersiveMode={immersiveMode} connectionStatus={connectionStatus} />
+        <StatusBar connectionStatus={connectionStatus} />
       </div>
 
       {/* Mobile navigation - Outside grid for proper fixed positioning */}
       <MobileNav connectionStatus={connectionStatus} />
+
+      {/* Install app banner - mobile browsers only */}
+      <InstallBanner />
 
       {/* Connection status toast */}
       <ConnectionToast status={connectionStatus} />

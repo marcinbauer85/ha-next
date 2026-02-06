@@ -19,6 +19,7 @@ export function PullToRevealPanel() {
     setRevealed,
   } = usePullToRevealContext();
 
+  const containerRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef<number | null>(null);
   const threshold = 80;
@@ -44,9 +45,16 @@ export function PullToRevealPanel() {
   // Touch event handlers for the drag handle
   useEffect(() => {
     const handle = handleRef.current;
-    if (!handle) return;
+    const container = containerRef.current;
+    if (!handle || !container) return;
 
     const handleTouchStart = (e: TouchEvent) => {
+      // If revealed, we allow dragging anywhere to close
+      // If not revealed, we only allow dragging from the handle
+      if (!isRevealedRef.current && !handle.contains(e.target as Node)) {
+        return;
+      }
+      
       e.stopPropagation(); // Prevent document-level listener from catching this
       handleIsActive.current = true;
       touchStartY.current = e.touches[0].clientY;
@@ -59,10 +67,10 @@ export function PullToRevealPanel() {
       const diff = currentY - touchStartY.current;
 
       if (isRevealedRef.current) {
-        if (diff > 0) {
+        if (diff < 0) {
           e.preventDefault();
           setPulling(true);
-          setPullDistance(diff * 0.6);
+          setPullDistance(Math.abs(diff));
         }
       } else {
         if (diff > 0) {
@@ -103,16 +111,16 @@ export function PullToRevealPanel() {
       handleIsActive.current = false;
     };
 
-    handle.addEventListener('touchstart', handleTouchStart, { passive: true });
-    handle.addEventListener('touchmove', handleTouchMove, { passive: false });
-    handle.addEventListener('touchend', handleTouchEnd, { passive: true });
+    container.addEventListener('touchstart', handleTouchStart, { passive: true });
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+    container.addEventListener('touchend', handleTouchEnd, { passive: true });
 
     return () => {
-      handle.removeEventListener('touchstart', handleTouchStart);
-      handle.removeEventListener('touchmove', handleTouchMove);
-      handle.removeEventListener('touchend', handleTouchEnd);
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+      container.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [setPulling, setPullDistance, setRevealed]);
+  }, [threshold, maxPull, setPulling, setPullDistance, setRevealed]);
 
   // Overscroll detection on dashboard - open panel when pulling down at top
   useEffect(() => {
@@ -133,6 +141,11 @@ export function PullToRevealPanel() {
         // When panel is open, track touches anywhere to close
         overscrollStartY.current = e.touches[0].clientY;
         overscrollIsTracking.current = true;
+        // Reset stale pull distance from the opening gesture (but only if not using handle)
+        if (!handleIsActive.current) {
+          pullDistanceRef.current = 0;
+          setPullDistance(0);
+        }
         return;
       }
 
@@ -199,8 +212,10 @@ export function PullToRevealPanel() {
         // When closed, open if pulled enough
         if (currentPullDistance >= threshold) {
           setRevealed(true);
+          setPullDistance(maxPull);
+        } else {
+          setPullDistance(0);
         }
-        setPullDistance(0);
         setPulling(false);
       }
 
@@ -235,7 +250,7 @@ export function PullToRevealPanel() {
         // Shrinking while closing - use calc to reduce from full height
         return `calc(100% - ${pullDistance}px)`;
       }
-      if (isRevealed) return undefined; // Use flex-1 instead
+      if (isRevealed) return '100dvh'; // Use 100dvh to ensure valid transition target
       if (pullDistance > 0) {
         return `${pullDistance + handleHeight}px`;
       }
@@ -244,9 +259,8 @@ export function PullToRevealPanel() {
 
     return (
       <div
-        className={`lg:hidden overflow-hidden transition-[height,flex] duration-300 ease-out ${
-          isRevealed && !isPulling ? 'flex-1' : ''
-        }`}
+        ref={containerRef}
+        className="lg:hidden overflow-hidden transition-[height] duration-300 ease-out"
         style={{ height: getHeight() }}
       >
         <div className={`h-full flex flex-col ${isRevealed ? 'pb-14' : 'justify-end'}`}>

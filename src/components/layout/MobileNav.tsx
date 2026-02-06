@@ -38,7 +38,7 @@ interface MobileNavProps {
 export function MobileNav({ disableAutoHide = false, connectionStatus }: MobileNavProps) {
   const pathname = usePathname();
   const { entities, haUrl } = useHomeAssistant();
-  const { isRevealed, close } = usePullToRevealContext();
+  const { isRevealed, close, open } = usePullToRevealContext();
   const [currentTime, setCurrentTime] = useState<string>('');
   const [isAM, setIsAM] = useState(true);
   const [colonVisible, setColonVisible] = useState(true);
@@ -335,7 +335,7 @@ export function MobileNav({ disableAutoHide = false, connectionStatus }: MobileN
           {/* Ask your home */}
           <button className="flex items-center gap-ha-2 bg-surface-low rounded-ha-pill px-ha-3 h-10 flex-1 min-w-0 overflow-hidden">
             <span className="text-sm text-text-disabled truncate flex-1 text-left">
-              Ask your <span className="text-text-tertiary/60 capitalize">{
+              Ask <span className="text-text-tertiary/60 capitalize">{
                 pathname === '/' ? 'Home' :
                 pathname.startsWith('/dashboard/') ? pathname.split('/')[2] :
                 pathname.startsWith('/panel/') ? pathname.split('/')[2] :
@@ -506,6 +506,9 @@ export function MobileNav({ disableAutoHide = false, connectionStatus }: MobileN
                 if (isRevealed) {
                   e.preventDefault();
                   close();
+                } else if (pathname === '/') {
+                  e.preventDefault();
+                  open();
                 }
               }}
             >

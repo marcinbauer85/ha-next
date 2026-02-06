@@ -4,8 +4,9 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from './Icon';
 import { Avatar } from './Avatar';
 import { Tooltip } from './Tooltip';
+import { RollingDigit } from './RollingDigit';
 import { useHomeAssistant } from '@/hooks';
-import { mdiUpdate, mdiWeb, mdiBell } from '@mdi/js';
+import { mdiUpdate, mdiWeb, mdiBell, mdiAlertCircle } from '@mdi/js';
 
 interface ScreensaverClockProps {
   visible: boolean;
@@ -22,6 +23,7 @@ export function ScreensaverClock({ visible, onDismiss }: ScreensaverClockProps) 
   const [isVisible, setIsVisible] = useState(visible);
   const [dragDistance, setDragDistance] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [isDismissing, setIsDismissing] = useState(false);
   const touchStartY = useRef<number | null>(null);
   const dragDistanceRef = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -53,6 +55,18 @@ export function ScreensaverClock({ visible, onDismiss }: ScreensaverClockProps) 
     }
     // Default to false (not exposed) if we can't determine
     return false;
+  }, [entities]);
+
+  // Count offline devices (only entities that belong to physical devices)
+  const offlineCount = useMemo(() => {
+    return Object.values(entities).filter((entity) => {
+      // Only count entities that belong to a physical device
+      const hasDeviceId = entity.attributes.device_id !== undefined && entity.attributes.device_id !== null;
+      if (!hasDeviceId) return false;
+      
+      // Check if the device is offline
+      return entity.state === 'unavailable' || entity.state === 'unknown';
+    }).length;
   }, [entities]);
 
   // Get current user's avatar
@@ -91,6 +105,14 @@ export function ScreensaverClock({ visible, onDismiss }: ScreensaverClockProps) 
   }, [visible]);
 
   const handleTransitionEnd = () => {
+    if (isDismissing) {
+      // Swipe-away animation finished — now actually dismiss
+      setIsDismissing(false);
+      setDragDistance(0);
+      dragDistanceRef.current = 0;
+      onDismiss();
+      return;
+    }
     if (!visible && !isVisible) {
       setShouldRender(false);
     }
@@ -102,8 +124,6 @@ export function ScreensaverClock({ visible, onDismiss }: ScreensaverClockProps) 
 
     const container = containerRef.current;
     if (!container) return;
-
-    const threshold = 150; // pixels to drag before dismissing
 
     const handleTouchStart = (e: TouchEvent) => {
       // Only enable drag on mobile (< 1024px)
@@ -126,12 +146,17 @@ export function ScreensaverClock({ visible, onDismiss }: ScreensaverClockProps) 
     };
 
     const handleTouchEnd = () => {
-      if (dragDistanceRef.current >= threshold) {
-        onDismiss();
+      const minSwipe = 30; // minimum drag to count as intentional swipe
+      if (dragDistanceRef.current >= minSwipe) {
+        // Animate off-screen to the top, then dismiss
+        setIsDragging(false);
+        setIsDismissing(true);
+      } else {
+        // Snap back for tiny accidental touches
+        dragDistanceRef.current = 0;
+        setDragDistance(0);
+        setIsDragging(false);
       }
-      dragDistanceRef.current = 0;
-      setDragDistance(0);
-      setIsDragging(false);
       touchStartY.current = null;
     };
 
@@ -181,19 +206,19 @@ export function ScreensaverClock({ visible, onDismiss }: ScreensaverClockProps) 
 
   // Calculate transform based on drag
   const dragProgress = Math.min(dragDistance / 150, 1); // 0 to 1
-  const translateY = isDragging ? -dragDistance : 0;
+  const translateY = isDismissing ? -window.innerHeight : isDragging ? -dragDistance : 0;
 
   return (
     <div
       ref={containerRef}
       className={`fixed inset-0 z-[100] bg-surface-default flex flex-col items-center justify-center transition-all ease-out ${
-        isDragging ? 'duration-0' : 'duration-500'
+        isDragging ? 'duration-0' : isDismissing ? 'duration-300' : 'duration-500'
       } ${
         isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none'
       } lg:cursor-pointer`}
       style={{
         transform: `translateY(${translateY}px)`,
-        opacity: isDragging ? 1 - dragProgress * 0.3 : undefined,
+        opacity: isDismissing ? 0 : isDragging ? 1 - dragProgress * 0.3 : undefined,
       }}
       onClick={() => {
         // Only dismiss on click for desktop
@@ -205,9 +230,15 @@ export function ScreensaverClock({ visible, onDismiss }: ScreensaverClockProps) 
     >
       {/* Main time display */}
       <div className="flex items-center gap-1" style={{ fontFamily: 'var(--font-mono)' }}>
-        <span className="text-[6rem] lg:text-[8rem] font-light text-text-primary leading-none tracking-tight">
-          {time.hours}
-        </span>
+        <div className="flex items-center">
+          {time.hours.split('').map((digit, i) => (
+            <RollingDigit
+              key={i}
+              digit={digit}
+              className="text-[6rem] lg:text-[8rem] font-light text-text-primary leading-none tracking-tight"
+            />
+          ))}
+        </div>
         <span
           className={`text-[6rem] lg:text-[8rem] font-light text-text-primary leading-none transition-opacity duration-100 ${
             colonVisible ? 'opacity-100' : 'opacity-20'
@@ -215,9 +246,15 @@ export function ScreensaverClock({ visible, onDismiss }: ScreensaverClockProps) 
         >
           :
         </span>
-        <span className="text-[6rem] lg:text-[8rem] font-light text-text-primary leading-none tracking-tight">
-          {time.minutes}
-        </span>
+        <div className="flex items-center">
+          {time.minutes.split('').map((digit, i) => (
+            <RollingDigit
+              key={i}
+              digit={digit}
+              className="text-[6rem] lg:text-[8rem] font-light text-text-primary leading-none tracking-tight"
+            />
+          ))}
+        </div>
         <div className="flex flex-col ml-3 -mt-2">
           <span
             className={`text-xl lg:text-2xl font-medium leading-tight ${
@@ -265,13 +302,19 @@ export function ScreensaverClock({ visible, onDismiss }: ScreensaverClockProps) 
 
         {/* Remote access indicator */}
         <Tooltip content={isRemoteConnected ? 'Remote Access: Available via internet' : 'Remote Access: Not exposed to internet'}>
-          <span className="cursor-help">
+          <div className="relative cursor-help">
             <Icon
               path={mdiWeb}
               size={22}
-              className={isRemoteConnected ? 'text-text-secondary' : 'text-red-500'}
+              className="text-text-secondary"
             />
-          </span>
+            {isRemoteConnected && (
+              <span className="absolute -top-0.5 -right-0.5 bg-green-500 rounded-full w-2.5 h-2.5" />
+            )}
+            {!isRemoteConnected && (
+              <span className="absolute -top-0.5 -right-0.5 bg-red-500 rounded-full w-2.5 h-2.5" />
+            )}
+          </div>
         </Tooltip>
 
         {/* Notifications indicator */}
@@ -280,13 +323,27 @@ export function ScreensaverClock({ visible, onDismiss }: ScreensaverClockProps) 
             <Icon
               path={mdiBell}
               size={22}
-              className={notificationCount > 0 ? 'text-yellow-600' : 'text-text-secondary'}
+              className="text-text-secondary"
             />
             {notificationCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 bg-yellow-500 rounded-full w-2.5 h-2.5" />
             )}
           </div>
         </Tooltip>
+
+        {/* Offline devices indicator */}
+        {offlineCount > 0 && (
+          <Tooltip content={`Offline: ${offlineCount} device${offlineCount > 1 ? 's' : ''} unavailable`}>
+            <div className="relative cursor-help">
+              <Icon
+                path={mdiAlertCircle}
+                size={22}
+                className="text-text-secondary"
+              />
+              <span className="absolute -top-0.5 -right-0.5 bg-red-500 rounded-full w-2.5 h-2.5 animate-pulse" />
+            </div>
+          </Tooltip>
+        )}
       </div>
 
       {/* Desktop: Hint to dismiss */}
@@ -294,15 +351,23 @@ export function ScreensaverClock({ visible, onDismiss }: ScreensaverClockProps) 
         Tap anywhere to dismiss
       </p>
 
+      {/* Desktop: Build Info */}
+      <p className="hidden lg:block absolute bottom-6 text-xs text-text-disabled opacity-40 font-mono">
+        Build 2026.2.0 • Feb 6, 2026 • 22:01
+      </p>
+
       {/* Mobile: Drag handle visual at bottom */}
       <div
         className="lg:hidden absolute bottom-0 left-0 right-0 flex flex-col items-center"
-        style={{ paddingBottom: `calc(env(safe-area-inset-bottom) + 2rem)`, paddingTop: '2rem' }}
+        style={{ paddingBottom: `calc(env(safe-area-inset-bottom) + 1.5rem)`, paddingTop: '2rem' }}
       >
         <p className="text-sm text-text-disabled mb-ha-3 animate-pulse">
           Drag up to dismiss
         </p>
-        <div className="w-10 h-1.5 rounded-full bg-text-secondary/40" />
+        <div className="w-10 h-1.5 rounded-full bg-text-secondary/40 mb-4" />
+        <p className="text-[10px] text-text-disabled opacity-40 font-mono">
+          Build 2026.2.0 • Feb 6, 2026 • 22:01
+        </p>
       </div>
     </div>
   );

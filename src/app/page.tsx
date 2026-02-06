@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, CSSProperties } from 'react';
 import { TopBar } from '@/components/layout';
 import { EntityCard, RoomCard } from '@/components/cards';
 import { DashboardSection, MobileSummaryRow, SummariesPanel, PullToRevealPanel } from '@/components/sections';
@@ -47,30 +47,72 @@ const SCREENSAVER_TIMEOUT = 60000; // 1 minute of inactivity
 export default function DashboardPage() {
   const { toggleTheme } = useTheme();
   const { clearCredentials } = useHomeAssistant();
-  const { immersiveMode, setImmersiveMode, toggleImmersiveMode } = useImmersiveMode();
+  const { immersiveMode, toggleImmersiveMode, immersivePhase } = useImmersiveMode();
   const [screensaverActive, setScreensaverActive] = useState(false);
   const scrollableRef = useRef<HTMLElement | null>(null);
   const { isRevealed } = usePullToRevealContext();
+  const [showTopGradient, setShowTopGradient] = useState(false);
+  const [showBottomGradient, setShowBottomGradient] = useState(false);
+
+  const isImmersiveFixed = immersivePhase !== 'normal';
+
+  // Status bar height: pt-ha-2 (8px) + h-12 content (48px) + pb-edge (12px)
+  const statusBarHeight = 'calc(var(--ha-space-2) + 48px + var(--ha-edge-padding))';
+
+  // Padding that positions bg-surface-lower at its normal grid location when fixed
+  const compensatingPadding = {
+    paddingLeft: 'calc(2 * var(--ha-edge-padding) + 64px)',
+    paddingTop: 'calc(var(--ha-edge-padding) + 64px)',
+    paddingRight: 'var(--ha-edge-padding)',
+    paddingBottom: 0,
+  };
+
+  // Expanded: edge padding on 3 sides, dashboard keeps rounded corners
+  const expandedPadding = {
+    paddingLeft: 'var(--ha-edge-padding)',
+    paddingTop: 'var(--ha-edge-padding)',
+    paddingRight: 'var(--ha-edge-padding)',
+    paddingBottom: 0,
+  };
+
+  const contentStyle: CSSProperties = isImmersiveFixed ? {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: statusBarHeight,
+    zIndex: 50,
+    margin: 0,
+    overflow: 'hidden',
+    backgroundColor: 'var(--ha-color-surface-default)',
+    ...(immersivePhase === 'preparing' ? {
+      ...compensatingPadding,
+      transition: 'none',
+    } : immersivePhase === 'expanded' ? {
+      ...expandedPadding,
+      transition: 'padding 300ms ease-out',
+    } : {
+      ...compensatingPadding,
+      transition: 'padding 300ms ease-out',
+    }),
+  } : {};
 
   // Screensaver idle timer
   const { wake } = useIdleTimer({
     timeout: SCREENSAVER_TIMEOUT,
     onIdle: () => {
       setScreensaverActive(true);
-      setImmersiveMode(true);
     },
   });
 
   const dismissScreensaver = useCallback(() => {
     setScreensaverActive(false);
-    setImmersiveMode(false);
     wake();
-  }, [wake, setImmersiveMode]);
+  }, [wake]);
 
   const activateScreensaver = useCallback(() => {
     setScreensaverActive(true);
-    setImmersiveMode(true);
-  }, [setImmersiveMode]);
+  }, []);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -95,11 +137,42 @@ export default function DashboardPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [screensaverActive, dismissScreensaver, activateScreensaver, toggleImmersiveMode]);
 
+  // Monitor scroll position to show/hide gradients
+  useEffect(() => {
+    const scrollElement = scrollableRef.current;
+    if (!scrollElement) return;
+
+    const updateGradients = () => {
+      const { scrollTop, scrollHeight, clientHeight } = scrollElement;
+      const threshold = 10; // Small threshold to account for rounding
+
+      // Show top gradient if scrolled down from the top
+      setShowTopGradient(scrollTop > threshold);
+
+      // Show bottom gradient if there's more content below
+      setShowBottomGradient(scrollTop + clientHeight < scrollHeight - threshold);
+    };
+
+    // Check on mount and when content changes
+    updateGradients();
+
+    // Listen to scroll events
+    scrollElement.addEventListener('scroll', updateGradients);
+    
+    // Also check on resize
+    window.addEventListener('resize', updateGradients);
+
+    return () => {
+      scrollElement.removeEventListener('scroll', updateGradients);
+      window.removeEventListener('resize', updateGradients);
+    };
+  }, []);
+
   return (
     <>
       {/* TopBar row */}
-      <div className={`px-edge lg:pr-edge overflow-hidden flex-shrink-0 ${
-        immersiveMode ? 'h-0 opacity-0 transition-[height,opacity] duration-300 ease-out' : 'h-16'
+      <div className={`px-edge lg:pr-edge overflow-hidden flex-shrink-0 h-16 transition-opacity duration-300 ease-out ${
+        immersivePhase !== 'normal' ? 'lg:opacity-0 lg:pointer-events-none' : 'opacity-100'
       }`}>
         <TopBar title="Home" />
       </div>
@@ -107,10 +180,15 @@ export default function DashboardPage() {
       {/* Pull to reveal - drag handle between TopBar and dashboard (Mobile only) */}
       <PullToRevealPanel />
 
-      {/* Main content row - shrinks as panel expands */}
-      <div className={`min-h-0 overflow-hidden px-edge pb-20 mt-1 lg:mt-0 lg:pb-ha-0 lg:pr-edge transition-all duration-300 ease-out ${
-        isRevealed ? 'flex-none h-0 opacity-0' : 'flex-1'
-      }`}>
+      {/* Main content row - expands over chrome in immersive mode */}
+      <div
+        className={`min-h-0 overflow-hidden ${
+          isRevealed ? 'flex-none h-0 opacity-0' : 'flex-1'
+        } ${!isImmersiveFixed ? 'px-edge pb-20 mt-1 lg:mt-0 lg:pb-ha-0 lg:pr-edge' : ''} ${
+          immersivePhase === 'normal' ? 'transition-[flex,height,opacity] duration-300 ease-out' : ''
+        }`}
+        style={contentStyle}
+      >
         <div className="h-full bg-surface-lower overflow-hidden rounded-ha-3xl">
           <div className="h-full flex flex-col lg:px-ha-5 lg:pt-ha-5 lg:pb-ha-5 overflow-hidden">
             {/* Content area */}
@@ -118,9 +196,14 @@ export default function DashboardPage() {
               {/* Main dashboard */}
               <main
                 ref={(el) => { scrollableRef.current = el; }}
-                className="flex-1 lg:pb-0 px-ha-3 lg:px-0 overscroll-none overflow-x-hidden overflow-y-auto touch-pan-y"
+                className="flex-1 lg:pb-0 px-ha-3 lg:px-0 overscroll-none overflow-x-hidden overflow-y-auto touch-pan-y relative"
                 data-scrollable="dashboard"
               >
+                {/* Gradient overlay for desktop - top */}
+                {showTopGradient && (
+                  <div className="hidden lg:block sticky top-0 left-0 right-0 h-12 pointer-events-none bg-gradient-to-b from-surface-lower to-transparent z-10 -mb-12" />
+                )}
+                
                 {/* Mobile summary row - sticky with glass effect on scroll */}
                 <MobileSummaryRow />
 
@@ -162,6 +245,11 @@ export default function DashboardPage() {
                     onClick={clearCredentials}
                   />
                 </DashboardSection>
+
+                {/* Gradient overlay for desktop - bottom */}
+                {showBottomGradient && (
+                  <div className="hidden lg:block sticky bottom-0 left-0 right-0 h-12 pointer-events-none bg-gradient-to-t from-surface-lower to-transparent z-10 -mt-12" />
+                )}
               </main>
 
               {/* Summaries panel - Desktop only */}

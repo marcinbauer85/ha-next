@@ -22,3 +22,5 @@ export { useSidebarItems, type SidebarItem } from './useSidebarItems';
 export { ImmersiveModeProvider, useImmersiveMode } from './useImmersiveMode';
 
 export { usePullToReveal } from './usePullToReveal';
+
+export { useStandaloneMode } from './useStandaloneMode';
